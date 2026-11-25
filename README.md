@@ -104,6 +104,14 @@ log is `/var/log/gantry/plugins/nautobot.log`.
 
 Environment variables and credentials are never sent to Nautobot.
 
+## Releases
+
+Push a tag `vX.Y.Z` matching the version in `Cargo.toml` and `plugin.toml`.
+The release workflow builds the .deb on Ubuntu 22.04, publishes a GitHub
+Release with build provenance, and adds the package to the INVITE Networks
+apt repository (`https://invite-networks.github.io/apt`, suite `stable`),
+the same one gantry is installed from.
+
 ## Development
 
 ```sh

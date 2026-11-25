@@ -1,0 +1,97 @@
+name: release
+
+# A pushed tag vX.Y.Z builds the .deb, publishes a GitHub Release with
+# build provenance, and adds the package to the INVITE Networks apt
+# repository. Run it by hand to build the package without publishing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Ubuntu 22.04 keeps the glibc requirement low enough for
+          # Debian 12 and Ubuntu 22.04 hosts.
+          - { arch: amd64, runner: ubuntu-22.04 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Tag matches Cargo.toml and plugin.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "gantry-nautobot") | .version')
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $version"; exit 1; }
+          grep -qx "version = \"$version\"" plugin.toml || { echo "plugin.toml version is not $version"; exit 1; }
+      - run: cargo install cargo-deb --locked
+      - run: cargo build --release --locked
+      - run: cargo deb --no-build
+      - name: Smoke test
+        run: |
+          dpkg-deb -c target/debian/*.deb | grep -q usr/lib/gantry/plugins/nautobot/plugin.toml
+          mkdir x && dpkg-deb -x target/debian/*.deb x
+          printf '%s\n' '{"type":"hello","api":1,"project":"p","host":"h"}' \
+            '{"id":1,"type":"event","hook":"post_up","data":{}}' |
+            GANTRY_PLUGIN_CONFIG=/nonexistent x/usr/lib/gantry/plugins/nautobot/gantry-nautobot |
+            grep -q '"ok":false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.arch }}
+          path: target/debian/*.deb
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum *.deb > SHA256SUMS
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.deb
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+
+  apt:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/checkout@v7
+        with:
+          repository: invite-networks/apt
+          ssh-key: ${{ secrets.APT_DEPLOY_KEY }}
+          path: apt
+      - name: Add the package to the apt repository
+        run: |
+          dest=apt/pool/main/g/gantry-nautobot
+          mkdir -p "$dest"
+          cp dist/*.deb "$dest/"
+          cd apt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pool
+          git commit -m "gantry-nautobot $GITHUB_REF_NAME"
+          git push
