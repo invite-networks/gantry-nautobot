@@ -1,0 +1,20 @@
+# /etc/gantry/plugins/nautobot.toml, root owned, mode 0600.
+
+# Nautobot's base URL and an API token that may read and write IPAM and
+# the invite-nautobot containers models.
+url = "https://nautobot.example.com"
+token = "0123456789abcdef0123456789abcdef01234567"
+
+# Extra CA certificate (PEM) for a Nautobot behind a private CA. The
+# system trust store is always used as well.
+# ca_file = "/usr/local/share/ca-certificates/internal-ca.crt"
+
+# Seconds for each API call.
+# timeout = 10
+
+# Status given to addresses the plugin creates.
+# ip_status = "Active"
+
+# The Device or Virtual Machine this host is in Nautobot. Default: the
+# host name, then its short form.
+# node = "host1"

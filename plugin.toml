@@ -1,0 +1,13 @@
+# gantry plugin manifest (docs/spec/plugins.md in the gantry repository).
+api = 1
+name = "nautobot"
+version = "0.1.0"
+exec = ["gantry-nautobot"]
+
+[hooks]
+post_up = { mode = "sync", timeout = "60s" }
+post_down = { mode = "sync", timeout = "60s" }
+
+[address]
+from = "nautobot"
+timeout = "30s"

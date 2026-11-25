@@ -1,0 +1,34 @@
+[package]
+name = "gantry-nautobot"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+description = "Gantry plugin that records pods, containers, volumes and addresses in Nautobot and allocates pod addresses from it"
+repository = "https://github.com/invite-networks/gantry-nautobot"
+readme = "README.md"
+
+[dependencies]
+ipnet = "2"
+nix = { version = "0.30", features = ["fs", "net", "hostname"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls", "rustls-tls-native-roots"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+
+[profile.release]
+lto = true
+strip = true
+
+[package.metadata.deb]
+maintainer = "INVITE Networks"
+depends = "gantry (>= 0.2.0)"
+section = "admin"
+priority = "optional"
+extended-description = "Installed as a gantry plugin. On gantry up and down it records each pod, its interfaces and addresses, its containers and their volumes in Nautobot through the invite-nautobot app (0.4.0 or later), and it allocates pod addresses for address: { from: nautobot } entries."
+assets = [
+    ["target/release/gantry-nautobot", "usr/lib/gantry/plugins/nautobot/", "755"],
+    ["plugin.toml", "usr/lib/gantry/plugins/nautobot/", "644"],
+    ["nautobot.example.toml", "usr/share/doc/gantry-nautobot/", "644"],
+    ["README.md", "usr/share/doc/gantry-nautobot/", "644"],
+]
